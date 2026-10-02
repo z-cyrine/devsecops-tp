@@ -2,4 +2,4 @@ flask==0.12.2
 werkzeug==0.14.1
 jinja2==2.10
 pyyaml==5.3
-requests==2.19.1
+requests==2.34.2
