@@ -28,6 +28,24 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: '0'
 
+      - name: Trivy export (JSON, all severities)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          image-ref: devsecops-tp:${{ github.sha }}
+          format: json
+          output: trivy-report.json
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Trivy export (text table, HIGH and CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          image-ref: devsecops-tp:${{ github.sha }}
+          format: table
+          output: trivy-report.txt
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
       - name: Trivy gate (fail on CRITICAL)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
@@ -35,3 +53,12 @@ jobs:
           format: table
           severity: CRITICAL
           exit-code: '1'
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: |
+            trivy-report.json
+            trivy-report.txt
