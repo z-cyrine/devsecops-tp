@@ -1,14 +1,18 @@
 import os
+import re
 import sqlite3
 import subprocess
 from flask import Flask, request
+from markupsafe import escape
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Vulnérabilité : secret codé en dur dans le code source
-app.config["SECRET_KEY"] = "super-secret-key-123"
+# Secret lu depuis l'environnement
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or os.urandom(32).hex()
 
 UPLOAD_FOLDER = "uploads"
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "txt", "pdf"}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -26,38 +30,44 @@ def index():
     return "Hello DevSecOps!"
 
 
-# Vulnérabilité 1 : injection SQL
+# Injection SQL corrigée
 @app.route("/user")
 def user():
     username = request.args.get("name", "")
-    query = "SELECT id, username FROM users WHERE username = '" + username + "'"
-    rows = get_db().execute(query).fetchall()
+    rows = get_db().execute(
+        "SELECT id, username FROM users WHERE username = ?", (username,)
+    ).fetchall()
     return str(rows)
 
 
-# Vulnérabilité 2 : injection de commande
+# Injection de commande corrigée
 @app.route("/ping")
 def ping():
     host = request.args.get("host", "127.0.0.1")
-    output = subprocess.check_output("ping -c 1 " + host, shell=True)
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", host):
+        return "invalid host", 400
+    output = subprocess.check_output(["ping", "-c", "1", host], timeout=5)
     return output
 
 
-# Vulnérabilité 3 : XSS
+# XSS corrigé
 @app.route("/hello")
 def hello():
     name = request.args.get("name", "")
-    return "<h1>Hello " + name + "</h1>"
+    return "<h1>Hello " + str(escape(name)) + "</h1>"
 
 
-# Vulnérabilité 4 : upload non contrôlé + path traversal
+# Upload corrigé
 @app.route("/upload", methods=["POST"])
 def upload():
     f = request.files["file"]
-    f.save(os.path.join(UPLOAD_FOLDER, f.filename))
+    filename = secure_filename(f.filename)
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in ALLOWED_EXTENSIONS:
+        return "file type not allowed", 400
+    f.save(os.path.join(UPLOAD_FOLDER, filename))
     return "uploaded"
 
 
 if __name__ == "__main__":
-    # Vulnérabilité 5 : mode debug activé
-    app.run(host="127.0.0.1", port=5001, debug=True)
+    app.run(host="127.0.0.1", port=5001, debug=False)
